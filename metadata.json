@@ -1,0 +1,6 @@
+{
+  "name": "ClinicFlow Casablanca",
+  "description": "Système de régulation clinique, flux patients, dossiers médicaux 360°, hospitalisation et facturation AMO/CNSS/CNOPS pour la Clinique Al Bassma.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
