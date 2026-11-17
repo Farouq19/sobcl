@@ -185,6 +185,16 @@ export default function App() {
     );
   };
 
+  // Handle full patient update (e.g. vital signs, medical history, notes)
+  const handleUpdatePatient = (updatedPatient: Patient) => {
+    setPatients((prev) =>
+      prev.map((p) => (p.id === updatedPatient.id ? updatedPatient : p))
+    );
+    if (selectedPatient.id === updatedPatient.id) {
+      setSelectedPatient(updatedPatient);
+    }
+  };
+
   // Handle bed status change
   const handleUpdateBedStatus = (
     roomId: string,
@@ -285,6 +295,7 @@ export default function App() {
               onSelectPatient={setSelectedPatient}
               onNavigate={setCurrentView}
               onOpenAmoCheck={() => setIsAmoCheckOpen(true)}
+              onUpdatePatient={handleUpdatePatient}
             />
           )}
 
@@ -322,6 +333,7 @@ export default function App() {
                 setSelectedPatient(p);
                 setCurrentView('patient-files');
               }}
+              onUpdatePatient={handleUpdatePatient}
             />
           )}
 

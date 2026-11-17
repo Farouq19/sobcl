@@ -100,6 +100,26 @@ export interface EmergencyContact {
   phone: string;
 }
 
+export interface VitalSignRecord {
+  id: string;
+  patientId: string;
+  timestamp: string; // ISO string e.g. "2024-10-24T10:15:00Z"
+  displayDate: string; // Formatted date e.g. "24/10/2024 à 10:15"
+  temperature: number; // in °C (e.g. 36.8)
+  systolicBP: number; // in mmHg (e.g. 135)
+  diastolicBP: number; // in mmHg (e.g. 85)
+  bloodPressure: string; // Formatted e.g. "135/85"
+  heartRate: number; // in bpm (e.g. 72)
+  oxygenSat?: number; // SpO2 in % (e.g. 99)
+  respiratoryRate?: number; // cpm (e.g. 15)
+  bloodGlucose?: string; // g/L (e.g. "0.98")
+  recordedBy: string; // Doctor or nurse name e.g. "Dr. Hicham Amrani"
+  context?: string; // e.g. "Consultation", "Suivi HTA", "Contrôle Post-op"
+  notes?: string;
+  status: 'normal' | 'warning' | 'critical';
+  alerts?: string[];
+}
+
 export interface Patient {
   id: string;
   cin: string;
@@ -142,6 +162,7 @@ export interface Patient {
     temperature?: number;
     respiratoryRate?: number;
   };
+  vitalsHistory?: VitalSignRecord[];
   notes?: string;
   isolationStatus?: 'none' | 'contact' | 'respiratory' | 'strict';
   diet?: string;

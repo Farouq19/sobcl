@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Patient, ViewMode } from '../../types';
 import { DataTable, Column, TableBadge, ActionButton, ActionGroup } from '../common/DataTable';
+import { PatientVitalSignsTracker } from './PatientVitalSignsTracker';
 
 interface PatientFilesViewProps {
   patients: Patient[];
@@ -8,6 +9,7 @@ interface PatientFilesViewProps {
   onSelectPatient: (patient: Patient) => void;
   onNavigate: (view: ViewMode) => void;
   onOpenAmoCheck: () => void;
+  onUpdatePatient?: (patient: Patient) => void;
 }
 
 export const PatientFilesView: React.FC<PatientFilesViewProps> = ({
@@ -15,13 +17,20 @@ export const PatientFilesView: React.FC<PatientFilesViewProps> = ({
   selectedPatient,
   onSelectPatient,
   onNavigate,
-  onOpenAmoCheck
+  onOpenAmoCheck,
+  onUpdatePatient
 }) => {
-  const [activeTab, setActiveTab] = useState<'consultations' | 'hospitalisations' | 'examens' | 'ordonnances' | 'factures'>('consultations');
+  const [activeTab, setActiveTab] = useState<'consultations' | 'constantes' | 'hospitalisations' | 'examens' | 'ordonnances' | 'factures'>('consultations');
   const [filterTag, setFilterTag] = useState<'all' | 'active' | 'amo' | 'hosp'>('all');
   const [searchFilter, setSearchFilter] = useState('');
-  const [patientViewMode, setPatientViewMode] = useState<'dossier' | 'table'>('table');
+  const [patientViewMode, setPatientViewMode] = useState<'dossier' | 'table'>('dossier');
   const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
+  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
+  const [forceHeaderOpen, setForceHeaderOpen] = useState(false);
+  const [isFocusMode, setIsFocusMode] = useState(false);
+
+  // Automatically collapse tall administrative cards on constantes tab to guarantee zero-scroll visibility
+  const isCompactHeader = activeTab === 'constantes' ? !forceHeaderOpen : isHeaderCollapsed;
 
   const showToast = (msg: string) => {
     setFeedbackToast(msg);
@@ -58,19 +67,50 @@ export const PatientFilesView: React.FC<PatientFilesViewProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-[16px] font-bold text-[#0b1c30]">Dossiers Médicaux Partagés & Annuaire</h1>
+              <h1 className="text-[16px] font-bold text-[#0b1c30]">Dossiers Médicaux Partagés 360°</h1>
               <span className="text-[10px] font-bold bg-[#eff4ff] text-[#188ace] px-2 py-0.5 rounded-full">
-                {patients.length} patients actifs
+                {patients.length} dossiers actifs
               </span>
             </div>
             <p className="text-[11px] text-[#76777d]">
-              Recherche instantanée CIN, suivi clinique 360°, conformité CNDP & éligibilité AMO.
+              Prise de constantes direct médecin, suivi clinique 360°, conformité CNDP & éligibilité AMO.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Tri-mode fast switcher: Dossier 360° | Constantes & Vitals | Annuaire */}
           <div className="flex bg-[#f1f5f9] p-1 rounded-lg border border-[#e2e8f0]">
+            <button
+              onClick={() => {
+                setPatientViewMode('dossier');
+                if (activeTab === 'constantes') setActiveTab('consultations');
+              }}
+              className={`px-3 py-1.5 text-[11px] font-bold rounded-md flex items-center gap-1.5 transition-all ${
+                patientViewMode === 'dossier' && activeTab !== 'constantes'
+                  ? 'bg-white text-[#006a61] shadow-2xs'
+                  : 'text-[#76777d] hover:text-[#0b1c30]'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[16px]">contact_page</span>
+              <span>Dossier 360°</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setPatientViewMode('dossier');
+                setActiveTab('constantes');
+              }}
+              className={`px-3 py-1.5 text-[11px] font-bold rounded-md flex items-center gap-1.5 transition-all ${
+                patientViewMode === 'dossier' && activeTab === 'constantes'
+                  ? 'bg-[#006a61] text-white shadow-2xs'
+                  : 'text-[#006a61] hover:text-[#0b1c30] bg-[#e6f7f5]/80 hover:bg-[#c9f1eb]'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[16px] text-red-500 animate-pulse">vital_signs</span>
+              <span>Constantes & Vitals</span>
+            </button>
+
             <button
               onClick={() => setPatientViewMode('table')}
               className={`px-3 py-1.5 text-[11px] font-bold rounded-md flex items-center gap-1.5 transition-all ${
@@ -82,17 +122,6 @@ export const PatientFilesView: React.FC<PatientFilesViewProps> = ({
               <span className="material-symbols-outlined text-[16px]">table_rows</span>
               <span>Tableau Annuaire</span>
             </button>
-            <button
-              onClick={() => setPatientViewMode('dossier')}
-              className={`px-3 py-1.5 text-[11px] font-bold rounded-md flex items-center gap-1.5 transition-all ${
-                patientViewMode === 'dossier'
-                  ? 'bg-white text-[#006a61] shadow-2xs'
-                  : 'text-[#76777d] hover:text-[#0b1c30]'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[16px]">contact_page</span>
-              <span>Fiche Dossier 360°</span>
-            </button>
           </div>
 
           <button
@@ -100,7 +129,7 @@ export const PatientFilesView: React.FC<PatientFilesViewProps> = ({
             className="px-3 py-1.5 bg-[#e6f7f5] hover:bg-[#c9f1eb] text-[#006a61] text-[11px] font-semibold rounded-lg border border-[#86f2e4]/70 transition-colors flex items-center gap-1"
           >
             <span className="material-symbols-outlined text-[15px]">document_scanner</span>
-            <span>Scanner CIN</span>
+            <span className="hidden sm:inline">Scanner CIN</span>
           </button>
         </div>
       </div>
@@ -196,7 +225,7 @@ export const PatientFilesView: React.FC<PatientFilesViewProps> = ({
               {
                 key: 'cin',
                 header: 'CIN & Contact',
-                width: '18%',
+                width: '15%',
                 render: (p) => (
                   <div>
                     <div className="font-mono font-bold text-[#0b1c30]">{p.cin}</div>
@@ -205,9 +234,34 @@ export const PatientFilesView: React.FC<PatientFilesViewProps> = ({
                 ),
               },
               {
+                key: 'vitals',
+                header: 'Constantes Vitales (TA / Temp / FC)',
+                width: '18%',
+                render: (p) => (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectPatient(p);
+                      setPatientViewMode('dossier');
+                      setActiveTab('constantes');
+                    }}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#e6f7f5] hover:bg-[#c9f1eb] text-[#006a61] border border-[#86f2e4] text-[11px] font-bold transition-all shadow-2xs group"
+                    title="Cliquer pour ouvrir la prise de constantes direct médecin"
+                  >
+                    <span className="material-symbols-outlined text-[14px] text-red-500 animate-pulse">vital_signs</span>
+                    <span>{p.vitals?.bloodPressure || '120/80'}</span>
+                    <span className="text-[#006a61]/30">•</span>
+                    <span className="text-rose-700">{p.vitals?.temperature || 36.8}°C</span>
+                    <span className="text-[#006a61]/30">•</span>
+                    <span className="text-[#006a61]">{p.vitals?.heartRate || 72} bpm</span>
+                  </button>
+                ),
+              },
+              {
                 key: 'amo',
                 header: 'Couverture AMO',
-                width: '16%',
+                width: '13%',
                 render: (p) => (
                   <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
                     p.amoType === 'CNSS'
@@ -225,7 +279,7 @@ export const PatientFilesView: React.FC<PatientFilesViewProps> = ({
               {
                 key: 'status',
                 header: 'Statut Clinique',
-                width: '16%',
+                width: '14%',
                 render: (p) => {
                   if (p.status === 'hospitalized') return <TableBadge variant="purple" dot>Hospitalisé</TableBadge>;
                   if (p.status === 'consultation') return <TableBadge variant="emerald" dot>En Consultation</TableBadge>;
@@ -236,7 +290,7 @@ export const PatientFilesView: React.FC<PatientFilesViewProps> = ({
               {
                 key: 'doctor',
                 header: 'Médecin Traitant',
-                width: '14%',
+                width: '12%',
                 render: (p) => (
                   <span className="text-[12px] text-[#0b1c30] font-medium truncate block">
                     {p.assignedDoctor || 'Dr. El Alami'}
@@ -245,18 +299,29 @@ export const PatientFilesView: React.FC<PatientFilesViewProps> = ({
               },
               {
                 key: 'actions',
-                header: 'Dossier',
-                width: '8%',
+                header: 'Actions',
+                width: '10%',
                 align: 'right',
                 render: (p) => (
                   <ActionGroup align="right" onClick={(e) => e.stopPropagation()}>
                     <ActionButton
-                      icon="folder_open"
-                      variant="teal"
-                      title="Ouvrir Fiche 360°"
+                      icon="vital_signs"
+                      variant="rose"
+                      title="Saisir Constantes Vitales"
                       onClick={() => {
                         onSelectPatient(p);
                         setPatientViewMode('dossier');
+                        setActiveTab('constantes');
+                      }}
+                    />
+                    <ActionButton
+                      icon="folder_open"
+                      variant="teal"
+                      title="Ouvrir Dossier 360°"
+                      onClick={() => {
+                        onSelectPatient(p);
+                        setPatientViewMode('dossier');
+                        setActiveTab('consultations');
                       }}
                     />
                   </ActionGroup>
@@ -274,9 +339,10 @@ export const PatientFilesView: React.FC<PatientFilesViewProps> = ({
         </div>
       ) : (
       /* Main Grid: Left Directory (1/3) + Right 360 File (2/3) */
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Left Directory Panel */}
-        <div className="lg:col-span-4 bg-white rounded-xl shadow-2xs border border-[#e2e8f0] flex flex-col h-[calc(100vh-140px)] min-h-[640px]">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        {/* Left Directory Panel (Hidden in focus mode) */}
+        {!isFocusMode && (
+          <div className="lg:col-span-4 bg-white rounded-xl shadow-2xs border border-[#e2e8f0] flex flex-col lg:sticky lg:top-4 self-start">
           {/* Header */}
           <div className="p-4 border-b border-[#f1f5f9] space-y-3">
             <div className="flex items-center justify-between">
@@ -348,7 +414,7 @@ export const PatientFilesView: React.FC<PatientFilesViewProps> = ({
           </div>
 
           {/* List */}
-          <div className="flex-1 overflow-y-auto divide-y divide-[#f1f5f9] p-2 space-y-1">
+          <div className="flex-1 overflow-y-auto divide-y divide-[#f1f5f9] p-2 space-y-1 max-h-[calc(100vh-220px)]">
             {filteredPatients.map((p) => {
               const isSelected = p.id === selectedPatient.id;
               return (
@@ -414,10 +480,29 @@ export const PatientFilesView: React.FC<PatientFilesViewProps> = ({
                   </div>
 
                   <div className="mt-2 flex items-center justify-between text-[11px] pt-1.5 border-t border-white/10">
-                    <span className={isSelected ? 'text-slate-300' : 'text-[#76777d]'}>
-                      {p.currentLocation || 'Ambulatoire'}
-                    </span>
-                    <span className={isSelected ? 'text-[#86f2e4]' : 'text-[#006a61] font-medium'}>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className={`truncate ${isSelected ? 'text-slate-300' : 'text-[#76777d]'}`}>
+                        {p.currentLocation || 'Ambulatoire'}
+                      </span>
+                      {p.vitals && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectPatient(p);
+                            setActiveTab('constantes');
+                          }}
+                          className={`text-[9px] font-mono px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0 transition-transform hover:scale-105 ${
+                            isSelected ? 'bg-white/20 text-[#86f2e4]' : 'bg-[#e6f7f5] text-[#006a61] hover:bg-[#c9f1eb]'
+                          }`}
+                          title="Cliquer pour ouvrir les constantes vitales"
+                        >
+                          <span className="material-symbols-outlined text-[11px] animate-pulse">vital_signs</span>
+                          <span>{p.vitals.bloodPressure || '120/80'}</span>
+                        </button>
+                      )}
+                    </div>
+                    <span className={`shrink-0 ml-1.5 ${isSelected ? 'text-[#86f2e4]' : 'text-[#006a61] font-medium'}`}>
                       {p.assignedDoctor}
                     </span>
                   </div>
@@ -426,130 +511,296 @@ export const PatientFilesView: React.FC<PatientFilesViewProps> = ({
             })}
           </div>
         </div>
+        )}
 
-        {/* Right 360° Patient View Panel */}
-        <div className="lg:col-span-8 bg-white rounded-xl shadow-2xs border border-[#e2e8f0] flex flex-col h-[calc(100vh-140px)] min-h-[640px] overflow-hidden">
-          {/* Top Patient Profile Banner */}
-          <div className="p-5 border-b border-[#f1f5f9] bg-linear-to-b from-[#f8f9ff] to-white">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-              {/* Identity & Avatar */}
-              <div className="flex items-start gap-4">
-                {selectedPatient.photoUrl ? (
-                  <img
-                    src={selectedPatient.photoUrl}
-                    alt={selectedPatient.name}
-                    className="h-16 w-16 rounded-xl object-cover border-2 border-white shadow-sm"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="h-16 w-16 rounded-xl bg-[#006a61] text-white text-2xl font-bold flex items-center justify-center shadow-sm">
-                    {selectedPatient.name.charAt(0)}
-                  </div>
-                )}
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="font-headline text-lg sm:text-xl font-bold text-[#0b1c30]">
-                      {selectedPatient.name}
-                    </h2>
-                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-pulse" />
-                      Actif en clinique
+        {/* Right 360° Patient View Panel (Natural unconstrained height, smooth browser scroll) */}
+        <div className={`${isFocusMode ? 'lg:col-span-12' : 'lg:col-span-8'} bg-white rounded-xl shadow-2xs border border-[#e2e8f0] flex flex-col`}>
+          {/* Top Patient Profile Banner (Collapsible to guarantee zero-scroll workspace for vitals) */}
+          {isCompactHeader ? (
+            <div className="px-4 py-2.5 border-b border-[#f1f5f9] bg-linear-to-r from-[#f8f9ff] to-white flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="h-8 w-8 rounded-lg bg-[#006a61] text-white font-bold flex items-center justify-center text-xs shrink-0">
+                  {selectedPatient.name.charAt(0)}
+                </div>
+                <div className="min-w-0">
+                  <div className="font-bold text-[13px] text-[#0b1c30] flex items-center gap-1.5 truncate">
+                    <span>{selectedPatient.name}</span>
+                    <span className="text-[10px] font-mono bg-[#eff4ff] text-[#006a61] px-1.5 py-0.2 rounded font-semibold">
+                      {selectedPatient.cin}
                     </span>
-                    <span className="text-[11px] font-mono font-semibold bg-[#eff4ff] text-[#006a61] px-2 py-0.5 rounded">
-                      Dossier #9420
+                    <span className="text-[10px] text-[#76777d]">
+                      {selectedPatient.age} ans
                     </span>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-3 text-[12px] text-[#45464d] mt-1.5">
-                    <span>CIN : <strong className="text-[#0b1c30]">{selectedPatient.cin}</strong></span>
-                    <span className="text-slate-300">•</span>
-                    <span>{selectedPatient.age} ans ({selectedPatient.birthDate || '14/05/1978'})</span>
-                    <span className="text-slate-300">•</span>
-                    <span>Tél : {selectedPatient.phone}</span>
-                  </div>
-
-                  <div className="text-[11px] text-[#76777d] mt-1 flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[14px]">home_pin</span>
-                    <span>{selectedPatient.address || '34 Rue Jean Jaurès, Maârif, Casablanca'}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Action Toolbar */}
-              <div className="flex flex-wrap sm:flex-col gap-2 shrink-0">
+              {/* Live Vitals Chip in collapsed bar */}
+              <button
+                type="button"
+                onClick={() => setActiveTab('constantes')}
+                className="bg-white hover:bg-teal-50 px-2.5 py-1 rounded-lg border border-[#006a61]/30 hover:border-[#006a61] flex items-center gap-1.5 transition-all shadow-2xs text-left"
+                title="Cliquer pour accéder aux Constantes Vitales"
+              >
+                <span className="material-symbols-outlined text-red-500 text-[15px] animate-pulse">vital_signs</span>
+                <span className="text-[11px] font-bold text-[#0b1c30]">
+                  {selectedPatient.vitals?.bloodPressure || '120/80'}
+                </span>
+                <span className="text-slate-300">•</span>
+                <span className="text-[11px] font-bold text-rose-600">
+                  {selectedPatient.vitals?.temperature || 36.8}°C
+                </span>
+                <span className="text-slate-300">•</span>
+                <span className="text-[11px] font-bold text-[#006a61]">
+                  {selectedPatient.vitals?.heartRate || 72} bpm
+                </span>
+              </button>
+
+              {/* Right actions in compact header */}
+              <div className="flex items-center gap-1.5 shrink-0">
                 <button
-                  onClick={() => showToast(`Feuille de Soins Électronique générée pour ${selectedPatient.name}`)}
-                  className="px-3 py-1.5 bg-[#006a61] hover:bg-[#00544d] text-white text-[12px] font-semibold rounded-lg shadow-xs transition-colors flex items-center justify-center gap-1.5"
+                  type="button"
+                  onClick={() => setActiveTab('constantes')}
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-colors flex items-center gap-1 ${
+                    activeTab === 'constantes'
+                      ? 'bg-[#006a61] text-white border-[#006a61]'
+                      : 'bg-[#e6f7f5] text-[#006a61] border-[#86f2e4] hover:bg-[#c9f1eb]'
+                  }`}
                 >
-                  <span className="material-symbols-outlined text-[16px]">receipt_long</span>
-                  <span>Émettre FSE Tiers-Payant</span>
+                  <span className="material-symbols-outlined text-[14px]">edit_note</span>
+                  <span>Saisir Constantes</span>
                 </button>
-                <div className="flex gap-2">
-                  <button
-                    onClick={onOpenAmoCheck}
-                    className="flex-1 px-2.5 py-1.5 bg-[#f8f9ff] hover:bg-[#eff4ff] text-[#006a61] text-[11px] font-semibold rounded-lg border border-[#dae2fd] transition-colors flex items-center justify-center gap-1"
-                  >
-                    <span className="material-symbols-outlined text-[15px]">verified</span>
-                    <span>Vérifier AMO</span>
-                  </button>
-                  <button
-                    onClick={() => onNavigate('hospitalization')}
-                    className="flex-1 px-2.5 py-1.5 bg-[#f8f9ff] hover:bg-[#eff4ff] text-[#0b1c30] text-[11px] font-semibold rounded-lg border border-[#dae2fd] transition-colors flex items-center justify-center gap-1"
-                  >
-                    <span className="material-symbols-outlined text-[15px]">bed</span>
-                    <span>Hospitaliser</span>
-                  </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activeTab === 'constantes') {
+                      setForceHeaderOpen(true);
+                    } else {
+                      setIsHeaderCollapsed(false);
+                    }
+                  }}
+                  className="px-2 py-1 rounded text-[#76777d] hover:text-[#0b1c30] hover:bg-[#f1f5f9] transition-colors flex items-center gap-1 text-[11px]"
+                  title="Afficher les détails administratifs complets (AMO, adresse)"
+                >
+                  <span className="material-symbols-outlined text-[15px]">badge</span>
+                  <span className="hidden md:inline">Détails Dossier & AMO</span>
+                  <span className="material-symbols-outlined text-[15px]">expand_more</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsFocusMode(!isFocusMode)}
+                  className="p-1 rounded text-[#76777d] hover:text-[#0b1c30] hover:bg-[#f1f5f9] transition-colors"
+                  title={isFocusMode ? "Afficher l'annuaire" : "Mode plein écran"}
+                >
+                  <span className="material-symbols-outlined text-[18px]">
+                    {isFocusMode ? 'fullscreen_exit' : 'fullscreen'}
+                  </span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Full Expanded Header */
+            <div className="p-4 sm:p-5 border-b border-[#f1f5f9] bg-linear-to-b from-[#f8f9ff] to-white shrink-0">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                {/* Identity & Avatar */}
+                <div className="flex items-start gap-3.5">
+                  {selectedPatient.photoUrl ? (
+                    <img
+                      src={selectedPatient.photoUrl}
+                      alt={selectedPatient.name}
+                      className="h-14 w-14 rounded-xl object-cover border-2 border-white shadow-sm"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="h-14 w-14 rounded-xl bg-[#006a61] text-white text-xl font-bold flex items-center justify-center shadow-sm">
+                      {selectedPatient.name.charAt(0)}
+                    </div>
+                  )}
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="font-headline text-lg font-bold text-[#0b1c30]">
+                        {selectedPatient.name}
+                      </h2>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                        Actif en clinique
+                      </span>
+                      <span className="text-[10px] font-mono font-semibold bg-[#eff4ff] text-[#006a61] px-1.5 py-0.5 rounded">
+                        Dossier #9420
+                      </span>
+
+                      {/* Direct Clickable Vitals Summary Badge */}
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('constantes')}
+                        className="bg-white hover:bg-teal-50 px-2.5 py-0.5 rounded-lg border border-[#006a61]/30 hover:border-[#006a61] flex items-center gap-1.5 transition-all shadow-2xs group"
+                        title="Cliquer pour ouvrir les constantes vitales"
+                      >
+                        <span className="material-symbols-outlined text-red-500 text-[14px]">vital_signs</span>
+                        <span className="text-[11px] font-bold text-[#0b1c30]">
+                          {selectedPatient.vitals?.bloodPressure || '120/80'}
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="text-[11px] font-bold text-rose-600">
+                          {selectedPatient.vitals?.temperature || 36.8}°C
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="text-[11px] font-bold text-[#006a61]">
+                          {selectedPatient.vitals?.heartRate || 72} bpm
+                        </span>
+                        <span className="text-[9px] font-bold text-[#006a61] bg-[#e6f7f5] px-1 py-0.2 rounded group-hover:bg-[#006a61] group-hover:text-white transition-colors">
+                          Saisir &rarr;
+                        </span>
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2.5 text-[11px] text-[#45464d] mt-1">
+                      <span>CIN : <strong className="text-[#0b1c30]">{selectedPatient.cin}</strong></span>
+                      <span className="text-slate-300">•</span>
+                      <span>{selectedPatient.age} ans ({selectedPatient.birthDate || '14/05/1978'})</span>
+                      <span className="text-slate-300">•</span>
+                      <span>Tél : {selectedPatient.phone}</span>
+                    </div>
+
+                    <div className="text-[10px] text-[#76777d] mt-0.5 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[13px]">home_pin</span>
+                      <span>{selectedPatient.address || '34 Rue Jean Jaurès, Maârif, Casablanca'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Toolbar */}
+                <div className="flex flex-wrap sm:flex-col gap-1.5 shrink-0">
+                  <div className="flex gap-1.5">
+                    {/* Direct Saisir Constantes CTA */}
+                    <button
+                      onClick={() => setActiveTab('constantes')}
+                      className={`px-3 py-1.5 text-[11px] font-bold rounded-lg border shadow-2xs transition-colors flex items-center justify-center gap-1 ${
+                        activeTab === 'constantes'
+                          ? 'bg-[#006a61] text-white border-[#006a61]'
+                          : 'bg-[#e6f7f5] hover:bg-[#c9f1eb] text-[#006a61] border-[#86f2e4]'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[15px] text-red-500">vital_signs</span>
+                      <span>Saisir Constantes</span>
+                    </button>
+
+                    <button
+                      onClick={() => showToast(`Feuille de Soins Électronique générée pour ${selectedPatient.name}`)}
+                      className="px-2.5 py-1.5 bg-[#006a61] hover:bg-[#00544d] text-white text-[11px] font-semibold rounded-lg shadow-xs transition-colors flex items-center justify-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">receipt_long</span>
+                      <span>Émettre FSE</span>
+                    </button>
+                  </div>
+
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={onOpenAmoCheck}
+                      className="flex-1 px-2 py-1 bg-[#f8f9ff] hover:bg-[#eff4ff] text-[#006a61] text-[10px] font-semibold rounded-lg border border-[#dae2fd] transition-colors flex items-center justify-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-[13px]">verified</span>
+                      <span>Vérifier AMO</span>
+                    </button>
+                    <button
+                      onClick={() => onNavigate('hospitalization')}
+                      className="flex-1 px-2 py-1 bg-[#f8f9ff] hover:bg-[#eff4ff] text-[#0b1c30] text-[10px] font-semibold rounded-lg border border-[#dae2fd] transition-colors flex items-center justify-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-[13px]">bed</span>
+                      <span>Hospitaliser</span>
+                    </button>
+                    {/* Header Collapse Toggle */}
+                    <button
+                      onClick={() => {
+                        if (activeTab === 'constantes') {
+                          setForceHeaderOpen(false);
+                        } else {
+                          setIsHeaderCollapsed(true);
+                        }
+                      }}
+                      className="px-2 py-1 text-[#76777d] hover:text-[#0b1c30] hover:bg-[#f1f5f9] rounded-lg border border-[#dae2fd]/70 transition-colors flex items-center gap-1 text-[10px] font-semibold"
+                      title="Réduire l'en-tête pour agrandir l'espace clinique"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">expand_less</span>
+                      <span>Réduire en-tête</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Coverage & Clinical Badges Strip: 4 Equal Cards */}
+              <div className="mt-3 pt-2.5 border-t border-[#dae2fd]/60 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                {/* 1. Couverture AMO */}
+                <div className="bg-[#eff4ff] p-2 rounded-lg border border-[#dae2fd]/60">
+                  <span className="text-[9px] font-bold text-[#76777d] uppercase tracking-wider block">
+                    Couverture Maladie
+                  </span>
+                  <div className="text-[11px] font-bold text-[#006a61] flex items-center gap-1 mt-0.5">
+                    <span className="material-symbols-outlined text-[14px]">health_and_safety</span>
+                    <span>{selectedPatient.amoType} ({selectedPatient.amoRate}%) Tiers-Payant</span>
+                  </div>
+                  <span className="text-[10px] text-[#45464d] block mt-0.5 truncate">
+                    {selectedPatient.secondaryInsurance || 'Mutuelle Saham / Sanlam (20%)'}
+                  </span>
+                </div>
+
+                {/* 2. Situation Comptable */}
+                <div className="bg-emerald-50/60 p-2 rounded-lg border border-emerald-200/60">
+                  <span className="text-[9px] font-bold text-emerald-800 uppercase tracking-wider block">
+                    Situation Comptable
+                  </span>
+                  <div className="text-[11px] font-bold text-emerald-800 flex items-center gap-1 mt-0.5">
+                    <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                    <span>{selectedPatient.balanceDue.toFixed(2)} MAD • À jour</span>
+                  </div>
+                  <span className="text-[10px] text-emerald-700 block mt-0.5">
+                    Aucun impayé guichet
+                  </span>
+                </div>
+
+                {/* 3. Alertes & Allergies */}
+                <div className="bg-red-50/60 p-2 rounded-lg border border-red-200/60">
+                  <span className="text-[9px] font-bold text-red-800 uppercase tracking-wider block">
+                    Alertes & Allergies
+                  </span>
+                  <div className="flex flex-wrap gap-1 mt-0.5">
+                    {(selectedPatient.allergies || ['Allergie Pénicilline']).map((al, idx) => (
+                      <span key={idx} className="text-[9px] font-bold bg-red-100 text-red-800 px-1 py-0.2 rounded">
+                        {al}
+                      </span>
+                    ))}
+                    {(selectedPatient.medicalAlerts || ['HTA Stade 1']).map((ma, idx) => (
+                      <span key={idx} className="text-[9px] font-semibold bg-amber-100 text-amber-800 px-1 py-0.2 rounded">
+                        {ma}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 4. Constantes Vitales du Profil */}
+                <div
+                  onClick={() => setActiveTab('constantes')}
+                  className="bg-teal-50/70 hover:bg-teal-100/70 cursor-pointer transition-all p-2 rounded-lg border border-[#006a61]/30 hover:border-[#006a61] group"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-bold text-[#006a61] uppercase tracking-wider block">
+                      Constantes Vitales
+                    </span>
+                    <span className="text-[9px] font-bold text-[#006a61] group-hover:underline flex items-center gap-0.5">
+                      Ouvrir &rarr;
+                    </span>
+                  </div>
+                  <div className="text-[11px] font-bold text-[#0b1c30] flex items-center gap-1 mt-0.5">
+                    <span className="material-symbols-outlined text-red-500 text-[14px]">vital_signs</span>
+                    <span>{selectedPatient.vitals?.bloodPressure || '120/80'} • {selectedPatient.vitals?.temperature || 36.8}°C</span>
+                  </div>
+                  <span className="text-[10px] text-[#006a61] block mt-0.5 font-medium truncate">
+                    {selectedPatient.vitalsHistory?.length || 1} relevé(s) • Pouls {selectedPatient.vitals?.heartRate || 72} bpm
+                  </span>
                 </div>
               </div>
             </div>
-
-            {/* Coverage & Clinical Badges Strip */}
-            <div className="mt-4 pt-3 border-t border-[#dae2fd]/60 grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="bg-[#eff4ff] p-2.5 rounded-lg border border-[#dae2fd]/60">
-                <span className="text-[10px] font-bold text-[#76777d] uppercase tracking-wider block">
-                  Couverture Maladie
-                </span>
-                <div className="text-[12px] font-bold text-[#006a61] flex items-center gap-1 mt-0.5">
-                  <span className="material-symbols-outlined text-[16px]">health_and_safety</span>
-                  <span>{selectedPatient.amoType} ({selectedPatient.amoRate}%) Tiers-Payant</span>
-                </div>
-                <span className="text-[11px] text-[#45464d] block mt-0.5">
-                  {selectedPatient.secondaryInsurance || 'Mutuelle Saham / Sanlam (20%)'}
-                </span>
-              </div>
-
-              <div className="bg-emerald-50/60 p-2.5 rounded-lg border border-emerald-200/60">
-                <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
-                  Situation Comptable
-                </span>
-                <div className="text-[12px] font-bold text-emerald-800 flex items-center gap-1 mt-0.5">
-                  <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                  <span>{selectedPatient.balanceDue.toFixed(2)} MAD • Dossier à jour</span>
-                </div>
-                <span className="text-[11px] text-emerald-700 block mt-0.5">
-                  Aucun impayé guichet
-                </span>
-              </div>
-
-              <div className="bg-red-50/60 p-2.5 rounded-lg border border-red-200/60">
-                <span className="text-[10px] font-bold text-red-800 uppercase tracking-wider block">
-                  Alertes Cliniques & Allergies
-                </span>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {(selectedPatient.allergies || ['Allergie Pénicilline']).map((al, idx) => (
-                    <span key={idx} className="text-[10px] font-bold bg-red-100 text-red-800 px-1.5 py-0.2 rounded">
-                      {al}
-                    </span>
-                  ))}
-                  {(selectedPatient.medicalAlerts || ['HTA Stade 1']).map((ma, idx) => (
-                    <span key={idx} className="text-[10px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded">
-                      {ma}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
+          )}
 
           {/* Navigation Tabs */}
           <div className="px-5 border-b border-[#f1f5f9] flex items-center gap-2 overflow-x-auto bg-white">
@@ -562,6 +813,17 @@ export const PatientFilesView: React.FC<PatientFilesViewProps> = ({
               }`}
             >
               Consultations (3)
+            </button>
+            <button
+              onClick={() => setActiveTab('constantes')}
+              className={`py-3 px-3 text-[12px] font-semibold border-b-2 transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                activeTab === 'constantes'
+                  ? 'border-[#006a61] text-[#006a61]'
+                  : 'border-transparent text-[#76777d] hover:text-[#0b1c30]'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[16px] text-red-500">vital_signs</span>
+              <span>Constantes & Vitals ({selectedPatient.vitalsHistory?.length || 1})</span>
             </button>
             <button
               onClick={() => setActiveTab('examens')}
@@ -603,10 +865,23 @@ export const PatientFilesView: React.FC<PatientFilesViewProps> = ({
             >
               Factures & Tiers-Payant (3)
             </button>
+
+            {/* Fullscreen / Focus Mode Toggle in Tabs bar */}
+            <button
+              type="button"
+              onClick={() => setIsFocusMode(!isFocusMode)}
+              className="ml-auto p-1.5 text-[#76777d] hover:text-[#006a61] hover:bg-[#f1f5f9] rounded-lg transition-colors flex items-center gap-1 text-[11px] font-semibold whitespace-nowrap shrink-0"
+              title={isFocusMode ? "Afficher l'annuaire médical" : "Plein écran dossier patient"}
+            >
+              <span className="material-symbols-outlined text-[16px]">
+                {isFocusMode ? 'fullscreen_exit' : 'fullscreen'}
+              </span>
+              <span className="hidden sm:inline">{isFocusMode ? 'Annuaire' : 'Plein Écran'}</span>
+            </button>
           </div>
 
-          {/* Tab Content Body */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {/* Tab Content Body - Natural unconstrained scrolling with page */}
+          <div className="p-3.5 sm:p-5 space-y-4">
             {activeTab === 'consultations' && (
               <>
                 {/* Active Consultation Block */}
@@ -626,29 +901,46 @@ export const PatientFilesView: React.FC<PatientFilesViewProps> = ({
                   </div>
 
                   {/* Vitals Ribbon */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                    <div className="bg-white p-2.5 rounded-lg border border-[#cbd5e1]/60">
-                      <span className="text-[10px] text-[#76777d] uppercase font-bold">Tension Artérielle</span>
-                      <div className="text-[14px] font-bold text-[#0b1c30] mt-0.5">
-                        {selectedPatient.vitals?.bloodPressure || '135/85'} <span className="text-[10px] font-normal text-[#76777d]">mmHg</span>
-                      </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-[#45464d] uppercase tracking-wider flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[#006a61] text-[15px]">vital_signs</span>
+                        <span>Dernières Constantes Relevées</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('constantes')}
+                        className="px-2.5 py-1 bg-white hover:bg-[#e6f7f5] text-[#006a61] text-[11px] font-bold rounded-md border border-[#86f2e4]/80 shadow-2xs transition-colors flex items-center gap-1"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">edit_note</span>
+                        <span>Saisie & Suivi Vital Signs</span>
+                      </button>
                     </div>
-                    <div className="bg-white p-2.5 rounded-lg border border-[#cbd5e1]/60">
-                      <span className="text-[10px] text-[#76777d] uppercase font-bold">Fréquence Cardiaque</span>
-                      <div className="text-[14px] font-bold text-[#006a61] mt-0.5">
-                        {selectedPatient.vitals?.heartRate || 72} <span className="text-[10px] font-normal text-[#76777d]">bpm</span>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      <div className="bg-white p-2.5 rounded-lg border border-[#cbd5e1]/60">
+                        <span className="text-[10px] text-[#76777d] uppercase font-bold">Tension Artérielle</span>
+                        <div className="text-[14px] font-bold text-[#0b1c30] mt-0.5">
+                          {selectedPatient.vitals?.bloodPressure || '135/85'} <span className="text-[10px] font-normal text-[#76777d]">mmHg</span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="bg-white p-2.5 rounded-lg border border-[#cbd5e1]/60">
-                      <span className="text-[10px] text-[#76777d] uppercase font-bold">Saturation O2</span>
-                      <div className="text-[14px] font-bold text-emerald-700 mt-0.5">
-                        {selectedPatient.vitals?.oxygenSat || 99} <span className="text-[10px] font-normal text-[#76777d]">%</span>
+                      <div className="bg-white p-2.5 rounded-lg border border-[#cbd5e1]/60">
+                        <span className="text-[10px] text-[#76777d] uppercase font-bold">Fréquence Cardiaque</span>
+                        <div className="text-[14px] font-bold text-[#006a61] mt-0.5">
+                          {selectedPatient.vitals?.heartRate || 72} <span className="text-[10px] font-normal text-[#76777d]">bpm</span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="bg-white p-2.5 rounded-lg border border-[#cbd5e1]/60">
-                      <span className="text-[10px] text-[#76777d] uppercase font-bold">Glycémie à jeun</span>
-                      <div className="text-[14px] font-bold text-[#0b1c30] mt-0.5">
-                        {selectedPatient.vitals?.bloodGlucose || '0.98'} <span className="text-[10px] font-normal text-[#76777d]">g/L</span>
+                      <div className="bg-white p-2.5 rounded-lg border border-[#cbd5e1]/60">
+                        <span className="text-[10px] text-[#76777d] uppercase font-bold">Saturation O2</span>
+                        <div className="text-[14px] font-bold text-emerald-700 mt-0.5">
+                          {selectedPatient.vitals?.oxygenSat || 99} <span className="text-[10px] font-normal text-[#76777d]">%</span>
+                        </div>
+                      </div>
+                      <div className="bg-white p-2.5 rounded-lg border border-[#cbd5e1]/60">
+                        <span className="text-[10px] text-[#76777d] uppercase font-bold">Glycémie à jeun</span>
+                        <div className="text-[14px] font-bold text-[#0b1c30] mt-0.5">
+                          {selectedPatient.vitals?.bloodGlucose || '0.98'} <span className="text-[10px] font-normal text-[#76777d]">g/L</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -727,6 +1019,17 @@ export const PatientFilesView: React.FC<PatientFilesViewProps> = ({
                   </div>
                 </div>
               </>
+            )}
+
+            {activeTab === 'constantes' && (
+              <PatientVitalSignsTracker
+                patient={selectedPatient}
+                onUpdatePatient={(updated) => {
+                  if (onUpdatePatient) onUpdatePatient(updated);
+                  onSelectPatient(updated);
+                }}
+                showToast={showToast}
+              />
             )}
 
             {activeTab === 'examens' && (

@@ -3,6 +3,7 @@ import { NursingTask, MedicationAdministration, Patient } from '../../types';
 import { INITIAL_NURSING_TASKS, INITIAL_MED_ADMINS } from '../../data/saasSeedData';
 import { ClinicalSelect, SelectOption } from '../common/ClinicalSelect';
 import { DataTable, Column, TableBadge, ActionButton, ActionGroup } from '../common/DataTable';
+import { PatientVitalSignsTracker } from './PatientVitalSignsTracker';
 
 const CARE_TYPE_OPTIONS: SelectOption[] = [
   { value: 'medication', label: 'Médicament', badge: 'Rx' },
@@ -16,9 +17,10 @@ const CARE_TYPE_OPTIONS: SelectOption[] = [
 interface NursingViewProps {
   patients: Patient[];
   onSelectPatient?: (patient: Patient) => void;
+  onUpdatePatient?: (patient: Patient) => void;
 }
 
-export const NursingView: React.FC<NursingViewProps> = ({ patients }) => {
+export const NursingView: React.FC<NursingViewProps> = ({ patients, onSelectPatient, onUpdatePatient }) => {
   const [tasks, setTasks] = useState<NursingTask[]>(INITIAL_NURSING_TASKS);
   const [medAdmins, setMedAdmins] = useState<MedicationAdministration[]>(INITIAL_MED_ADMINS);
   const [activeSubTab, setActiveSubTab] = useState<'tasks' | 'mar' | 'vitals'>('tasks');
@@ -218,6 +220,15 @@ export const NursingView: React.FC<NursingViewProps> = ({ patients }) => {
         >
           <span className="material-symbols-outlined text-[18px]">medication</span>
           <span>Administration Médicamenteuse (MAR)</span>
+        </button>
+        <button
+          onClick={() => setActiveSubTab('vitals')}
+          className={`flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-semibold border-b-2 transition-colors ${
+            activeSubTab === 'vitals' ? 'border-[#006a61] text-[#006a61]' : 'border-transparent text-[#76777d]'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[18px]">vital_signs</span>
+          <span>Constantes & Vitals ({selectedPatient.vitalsHistory?.length || 1})</span>
         </button>
       </div>
 
@@ -555,6 +566,17 @@ export const NursingView: React.FC<NursingViewProps> = ({ patients }) => {
             rowHeight="h-14"
           />
         </div>
+      )}
+
+      {/* SUBTAB 3: VITALS SIGNS TRACKING */}
+      {activeSubTab === 'vitals' && (
+        <PatientVitalSignsTracker
+          patient={selectedPatient}
+          onUpdatePatient={(updated) => {
+            if (onUpdatePatient) onUpdatePatient(updated);
+            if (onSelectPatient) onSelectPatient(updated);
+          }}
+        />
       )}
 
       {/* Plan New Care Task Modal */}
